@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      * { box-sizing: border-box; }
+      html, body { width: 3072px; height: 850px; margin: 0; overflow: hidden; background: #02080d; }
+      main { display: grid; grid-template-columns: 1536px 1536px; height: 850px; }
+      figure { position: relative; margin: 0; overflow: hidden; border-right: 2px solid #3d6077; background: #061019; }
+      img { position: absolute; top: -25px; width: 1920px; max-width: none; }
+      figure:first-child img { left: -280px; }
+      figure:last-child img { left: -330px; }
+      figcaption { position: absolute; top: 8px; left: 10px; z-index: 2; padding: 5px 8px; color: white; background: #07131ddd; border: 1px solid #31546b; border-radius: 4px; font: 12px Segoe UI, sans-serif; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <figure><figcaption>Source: chart, score, risk and analytics</figcaption><img src="quant-research-cockpit-reference.png" /></figure>
+      <figure><figcaption>Implementation: synchronized chart, score, risk and analytics</figcaption><img src="implementation-sync-1440x1024.png" /></figure>
+    </main>
+  </body>
+</html>

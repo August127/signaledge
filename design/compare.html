@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      * { box-sizing: border-box; }
+      html, body { width: 3072px; height: 1024px; margin: 0; overflow: hidden; background: #02080d; }
+      main { display: grid; grid-template-columns: 1536px 1536px; height: 1024px; }
+      figure { position: relative; display: grid; place-items: center; margin: 0; border-right: 2px solid #3d6077; background: #061019; }
+      img { max-width: 100%; max-height: 100%; object-fit: contain; }
+      figcaption { position: absolute; top: 8px; left: 10px; z-index: 2; padding: 5px 8px; color: white; background: #07131ddd; border: 1px solid #31546b; border-radius: 4px; font: 12px Segoe UI, sans-serif; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <figure><figcaption>Source visual target</figcaption><img src="quant-research-cockpit-reference.png" /></figure>
+      <figure><figcaption>Implementation with synchronized workspace</figcaption><img src="implementation-sync-1440x1024.png" /></figure>
+    </main>
+  </body>
+</html>

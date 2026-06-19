@@ -1,0 +1,383 @@
+openapi: 3.1.0
+info:
+  title: SignalEdge API
+  version: 0.6.0
+  description: Closed-candle scanner and signed signal-evidence API.
+servers:
+  - url: http://127.0.0.1:8787
+paths:
+  /api/health:
+    get:
+      operationId: health
+      responses:
+        "200":
+          description: Service health
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, enum: [warming, operational, degraded, blocked] }
+                  ready: { type: boolean }
+                  service: { type: string }
+                  mode: { type: string, const: closed-candle }
+                  calculationVersion: { type: string }
+                  serverTime: { type: string, format: date-time }
+                  cache: { type: object }
+  /api/health/live:
+    get:
+      operationId: liveness
+      responses:
+        "200": { description: Process is alive }
+  /api/health/ready:
+    get:
+      operationId: readiness
+      responses:
+        "200": { description: Provider is ready or degraded but serviceable }
+        "503": { description: Provider is warming or blocked }
+  /api/evidence/public-key:
+    get:
+      operationId: getEvidencePublicKey
+      responses:
+        "200":
+          description: Ed25519 public JWK used to verify evidence envelopes
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [algorithm, keyId, publicKey]
+                properties:
+                  algorithm: { type: string, const: Ed25519 }
+                  keyId: { type: string }
+                  publicKey: { type: object }
+  /udf/config:
+    get:
+      operationId: udfConfig
+      responses:
+        "200": { description: TradingView UDF datafeed configuration }
+  /udf/search:
+    get:
+      operationId: udfSearch
+      parameters:
+        - { name: query, in: query, schema: { type: string } }
+        - { name: exchange, in: query, schema: { type: string } }
+        - { name: type, in: query, schema: { type: string, enum: [stock, crypto, ""] } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 50 } }
+      responses:
+        "200": { description: TradingView UDF symbol search results }
+  /udf/symbols:
+    get:
+      operationId: udfResolveSymbol
+      parameters:
+        - { name: symbol, in: query, required: true, schema: { type: string } }
+      responses:
+        "200": { description: TradingView UDF symbol info }
+        "404": { description: Symbol not found }
+  /udf/history:
+    get:
+      operationId: udfHistory
+      parameters:
+        - { name: symbol, in: query, required: true, schema: { type: string } }
+        - { name: resolution, in: query, required: true, schema: { type: string, enum: ["240", "1D", D, H4] } }
+        - { name: from, in: query, schema: { type: integer } }
+        - { name: to, in: query, schema: { type: integer } }
+        - { name: countback, in: query, schema: { type: integer, minimum: 1, maximum: 1000 } }
+      responses:
+        "200": { description: TradingView UDF OHLCV history payload }
+  /udf/time:
+    get:
+      operationId: udfTime
+      responses:
+        "200": { description: Unix server time as plain text }
+  /udf/quotes:
+    get:
+      operationId: udfQuotes
+      parameters:
+        - { name: symbols, in: query, schema: { type: string } }
+      responses:
+        "200": { description: TradingView UDF quotes payload }
+  /api/system/status:
+    get:
+      operationId: getSystemStatus
+      security: [{ BearerApi: [] }]
+      responses:
+        "200":
+          description: Provider, data-quality, cache, and operations telemetry
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, enum: [warming, operational, degraded, blocked] }
+                  calculationVersion: { type: string }
+                  provider: { type: object }
+                  cache: { type: object }
+                  operations: { type: object }
+                  serverTime: { type: string, format: date-time }
+  /api/data/series:
+    get:
+      operationId: getMarketDataSeriesStatus
+      security: [{ BearerApi: [] }]
+      parameters:
+        - name: symbol
+          in: query
+          schema: { type: string, minLength: 2, maxLength: 20 }
+        - name: timeframe
+          in: query
+          schema: { type: string, enum: [D1, H4] }
+      responses:
+        "200":
+          description: Per-series provider source, freshness, fallback state, and MTF execution gates
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, total, bootstrap, checkedAt]
+                properties:
+                  items: { type: array, items: { type: object } }
+                  total: { type: integer }
+                  bootstrap: { type: string }
+                  checkedAt: { type: string, format: date-time }
+        "400": { $ref: "#/components/responses/InvalidRequest" }
+        "404": { description: Symbol not found }
+        "429": { $ref: "#/components/responses/RateLimited" }
+  /api/scanner:
+    get:
+      operationId: getScanner
+      security: [{ BearerApi: [] }]
+      parameters:
+        - $ref: "#/components/parameters/ConfirmationBars"
+      responses:
+        "200":
+          description: Ranked scanner snapshot
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ScannerEnvelope"
+        "400": { $ref: "#/components/responses/InvalidRequest" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+  /api/chart/{symbol}:
+    get:
+      operationId: getChartAnalysis
+      security: [{ BearerApi: [] }]
+      parameters:
+        - name: symbol
+          in: path
+          required: true
+          schema: { type: string, minLength: 2, maxLength: 20 }
+        - $ref: "#/components/parameters/ConfirmationBars"
+        - name: timeframe
+          in: query
+          schema: { type: string, enum: [D1, H4], default: H4 }
+      responses:
+        "200":
+          description: OHLCV and complete strategy evidence
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AnalysisEnvelope"
+        "400": { $ref: "#/components/responses/InvalidRequest" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+  /api/workspace/{symbol}:
+    get:
+      operationId: getWorkspace
+      security: [{ BearerApi: [] }]
+      description: Atomic scanner and selected-chart snapshot with consistency metadata and ETag revalidation.
+      parameters:
+        - name: symbol
+          in: path
+          required: true
+          schema: { type: string, minLength: 2, maxLength: 20 }
+        - $ref: "#/components/parameters/ConfirmationBars"
+        - name: timeframe
+          in: query
+          schema: { type: string, enum: [D1, H4], default: H4 }
+      responses:
+        "200":
+          description: Synchronized cockpit workspace
+          headers:
+            ETag: { schema: { type: string } }
+            X-Calculation-Version: { schema: { type: string } }
+            X-Evidence-Key-Id: { schema: { type: string } }
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkspaceEnvelope"
+        "304": { description: Snapshot unchanged }
+        "400": { $ref: "#/components/responses/InvalidRequest" }
+        "404": { description: Symbol not found }
+        "429": { $ref: "#/components/responses/RateLimited" }
+  /api/alerts:
+    get:
+      operationId: listAlerts
+      security: [{ BearerApi: [] }]
+      responses:
+        "200":
+          description: Persisted alert policies
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items: { type: array, items: { type: object } }
+                  total: { type: integer }
+    post:
+      operationId: createAlert
+      security: [{ BearerApi: [] }]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [symbol, mode, channels]
+              properties:
+                symbol: { type: string, minLength: 2, maxLength: 20 }
+                mode: { type: string, enum: [confirmed, watch] }
+                channels:
+                  type: array
+                  minItems: 1
+                  uniqueItems: true
+                  items: { type: string, enum: [app, email, telegram] }
+      responses:
+        "201":
+          description: Alert armed
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [id, status, symbol, mode, channels, policy]
+                properties:
+                  id: { type: string, format: uuid }
+                  status: { type: string, const: armed }
+                  symbol: { type: string }
+                  mode: { type: string }
+                  channels: { type: array, items: { type: string } }
+                  policy: { type: string }
+        "400": { $ref: "#/components/responses/InvalidRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "429": { $ref: "#/components/responses/RateLimited" }
+  /api/alerts/{id}:
+    delete:
+      operationId: disableAlert
+      security: [{ BearerApi: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200": { description: Alert disabled }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { description: Alert not found }
+  /api/journal:
+    get:
+      operationId: listJournal
+      security: [{ BearerApi: [] }]
+      responses:
+        "200": { description: Persisted journal entries }
+    post:
+      operationId: createJournalEntry
+      security: [{ BearerApi: [] }]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [symbol, timeframe, score, classification, signal]
+              properties:
+                symbol: { type: string }
+                timeframe: { type: string, enum: [D1, H4] }
+                score: { type: integer, minimum: 0, maximum: 100 }
+                classification: { type: string, enum: [A+, A, B, C] }
+                signal: { type: string }
+                snapshotId: { type: [string, "null"] }
+                notes: { type: string, maxLength: 2000 }
+      responses:
+        "201": { description: Journal entry created }
+        "200": { description: Idempotent replay }
+        "400": { $ref: "#/components/responses/InvalidRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+    delete:
+      operationId: clearJournal
+      security: [{ BearerApi: [] }]
+      responses:
+        "200": { description: SignalEdge journal cleared }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+components:
+  securitySchemes:
+    BearerApi:
+      type: http
+      scheme: bearer
+  parameters:
+    ConfirmationBars:
+      name: confirmationBars
+      in: query
+      schema: { type: integer, minimum: 1, maximum: 10, default: 3 }
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: false
+      schema: { type: string, minLength: 8, maxLength: 128 }
+  responses:
+    InvalidRequest:
+      description: Invalid request
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error: { type: string }
+              issues: { type: array, items: { type: object } }
+    RateLimited:
+      description: Rate limit exceeded
+    Unauthorized:
+      description: Missing or invalid API Bearer token
+  schemas:
+    EvidenceEnvelope:
+      type: object
+      required: [data, signature, algorithm, keyId, issuedAt]
+      properties:
+        data: {}
+        signature: { type: string }
+        algorithm: { type: string, const: Ed25519 }
+        keyId: { type: string }
+        issuedAt: { type: string, format: date-time }
+    ScannerEnvelope:
+      allOf:
+        - $ref: "#/components/schemas/EvidenceEnvelope"
+        - type: object
+          properties:
+            data:
+              type: object
+              required: [items, total, sync]
+              properties:
+                items: { type: array, items: { type: object } }
+                total: { type: integer }
+                sync: { type: object }
+    AnalysisEnvelope:
+      allOf:
+        - $ref: "#/components/schemas/EvidenceEnvelope"
+        - type: object
+          properties:
+            data:
+              type: object
+              description: OHLCV, HA, ATR bands, EMA, pivots, Spartan, structure, sweeps, Crystal, Order Block, MTF, score and synchronization evidence.
+    WorkspaceEnvelope:
+      allOf:
+        - $ref: "#/components/schemas/EvidenceEnvelope"
+        - type: object
+          properties:
+            data:
+              type: object
+              required: [scanner, chart, selectedScanner, synchronization]
+              properties:
+                scanner: { type: object }
+                chart: { type: object }
+                selectedScanner: { type: object }
+                synchronization: { type: object }
